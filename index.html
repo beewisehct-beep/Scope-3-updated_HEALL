@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEALL — Scope 3 Data Collection</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --g1:#12B886; --g2:#2E7BEB;
+    --paper:#FFFFFF; --canvas:#FFFFFF; --sidebar:#F6F9F8; --ink:#16202A; --ink-soft:#5B6B74;
+    --line:#E7ECEA; --line-soft:#F4F7F6;
+    --good:#12B886; --bad:#E0577A; --warn:#D9A404;
+    --chip1:#12B886; --chip2:#2E7BEB; --chip3:#F472B6; --chip4:#D9A404; --chip5:#A78BFA; --chip6:#8D6E63;
+    --focus:#2E7BEB;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#161D22; --canvas:#161D22; --sidebar:#101619; --ink:#EAF1EF; --ink-soft:#9AACA6;
+      --line:#2B3438; --line-soft:#20282C;
+      --good:#3FD6A8; --bad:#EB8AA3; --warn:#E9C24A;
+      --chip1:#3FD6A8; --chip2:#5B9BF2; --chip3:#F49AC6; --chip4:#E9C24A; --chip5:#BDA8F7; --chip6:#B79C90;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#161D22; --canvas:#161D22; --sidebar:#101619; --ink:#EAF1EF; --ink-soft:#9AACA6;
+    --line:#2B3438; --line-soft:#20282C;
+    --good:#3FD6A8; --bad:#EB8AA3; --warn:#E9C24A;
+    --chip1:#3FD6A8; --chip2:#5B9BF2; --chip3:#F49AC6; --chip4:#E9C24A; --chip5:#BDA8F7; --chip6:#B79C90;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--canvas); color:var(--ink);
+    font-family:'IBM Plex Sans Thai','IBM Plex Sans', system-ui, sans-serif;
+    font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{ font-family:inherit; font-weight:700; margin:0; color:var(--ink); }
+  a{ color:var(--g2); }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  .shell{ display:flex; min-height:100vh; max-width:1520px; margin:0 auto; }
+  .rail{
+    width:246px; flex:none; background:var(--sidebar); border-right:1px solid var(--line);
+    padding:24px 16px; position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+  }
+  .rail-mark{
+    display:inline-flex; align-items:center; padding:8px 16px; border-radius:0 10px 10px 0;
+    background:linear-gradient(100deg, var(--g1), var(--g2)); color:#fff; font-weight:700; font-size:15px; margin-bottom:4px;
+  }
+  .rail .tag{ font-size:11px; color:var(--ink-soft); margin:6px 0 20px; line-height:1.5; }
+  .rail-h{ font-size:10.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; margin:16px 0 8px; padding:0 2px; }
+  .rail nav{ display:flex; flex-direction:column; gap:1px; }
+  .rail nav a{ text-decoration:none; color:var(--ink-soft); font-size:13.5px; padding:8px 10px; border-radius:8px; font-weight:500; }
+  .rail nav a:hover{ color:var(--ink); background:var(--paper); }
+  .rail nav a.active{ color:#fff; background:linear-gradient(100deg, var(--g1), var(--g2)); }
+  .rail nav a.disabled{ opacity:0.4; cursor:default; pointer-events:none; }
+  .rail nav a .scope-tag{
+    float:right; font-size:9.5px; font-weight:700; color:var(--ink-soft); background:var(--line-soft);
+    padding:1px 6px; border-radius:10px; margin-top:1px;
+  }
+  .rail nav a.active .scope-tag{ background:rgba(255,255,255,0.25); color:#fff; }
+
+  .scope-group{ border-left:2px solid var(--line); margin:2px 0 2px 4px; padding-left:8px; }
+  .scope-head{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--ink);
+    padding:8px 4px 4px;
+  }
+  .scope-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .scope-dot.s1{ background:#D9A404; }
+  .scope-dot.s2{ background:#2E7BEB; }
+  .scope-dot.s3{ background:#12B886; }
+  .scope-sub{ font-weight:400; color:var(--ink-soft); font-size:10px; }
+  .scope-total{ margin-left:auto; font-size:10px; font-weight:700; color:var(--ink-soft); font-family:monospace; }
+  .rail-foot{ margin-top:20px; padding:12px 13px; border-radius:10px; background:var(--paper); border:1px solid var(--line); font-size:11px; color:var(--ink-soft); line-height:1.55; }
+
+  .main{ flex:1; min-width:0; padding:26px 36px 70px; }
+  .top-bar{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:6px; }
+  .top-bar h1{ font-size:22px; margin-bottom:4px; }
+  .top-bar .sub{ font-size:13px; color:var(--ink-soft); }
+  .field-strip{ display:flex; gap:10px; flex-wrap:wrap; }
+  .mfield{ font-size:12px; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .mfield label{ display:block; color:var(--ink-soft); font-size:10px; margin-bottom:2px; }
+  .mfield input{ font:inherit; font-size:12.5px; color:var(--ink); background:transparent; border:none; padding:0; min-width:140px; }
+  .mfield input:focus{ outline:none; }
+
+  .card{ background:var(--paper); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 2px rgba(20,30,28,0.05); }
+  section{ margin-top:30px; scroll-margin-top:20px; }
+  .sec-label{ display:inline-block; font-size:10.5px; font-weight:700; color:var(--g2); letter-spacing:0.03em; margin-bottom:6px; text-transform:uppercase; }
+  section h2{ font-size:19px; margin-bottom:4px; }
+  section > p.lead{ color:var(--ink-soft); max-width:680px; font-size:13.5px; margin:0 0 16px; }
+
+  /* pills / banner */
+  .pill-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .pill{ font-size:11.5px; font-weight:700; padding:6px 13px; border-radius:20px; background:var(--line-soft); color:var(--ink-soft); }
+  .pill.on{ color:#fff; background:linear-gradient(100deg, var(--g1), var(--g2)); }
+  .pill.off{ opacity:0.55; }
+  .banner{ font-size:12px; color:var(--ink-soft); background:var(--line-soft); border-radius:20px; padding:6px 14px; margin-left:auto; }
+
+  /* KPI */
+  .kpi-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:14px; }
+  .kpi-card{ padding:16px 18px; }
+  .kpi-lbl{ font-size:11.5px; font-weight:600; color:var(--ink-soft); }
+  .kpi-val{ font-size:25px; font-weight:700; color:var(--ink); line-height:1.15; margin-top:6px; }
+  .kpi-val small{ font-size:12px; font-weight:400; color:var(--ink-soft); }
+  .kpi-delta{ font-size:11.5px; font-weight:700; margin-top:6px; display:inline-block; padding:2px 8px; border-radius:20px; }
+  .kpi-delta.good{ color:var(--good); background:color-mix(in srgb, var(--good) 14%, transparent); }
+  .kpi-delta.bad{ color:var(--bad); background:color-mix(in srgb, var(--bad) 14%, transparent); }
+  .kpi-checklist{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .chk{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; background:var(--line-soft); color:var(--ink-soft); }
+  .chk.done{ color:#fff; background:var(--good); }
+  .chk.pending{ color:var(--warn); background:color-mix(in srgb, var(--warn) 16%, transparent); }
+  .kpi-sub2{ font-size:11px; color:var(--ink-soft); margin-top:6px; }
+
+  /* GHG formula panel */
+  .ghg-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:12px; margin-top:4px; }
+  .ghg-item{ background:var(--line-soft); border-radius:12px; padding:14px 16px; }
+  .ghg-item .gk{ font-size:11.5px; font-weight:700; color:var(--ink-soft); }
+  .ghg-item .gv{ font-size:20px; font-weight:700; color:var(--ink); margin-top:4px; }
+  .ghg-item .gf{ font-size:11px; color:var(--ink-soft); margin-top:3px; font-family:monospace; }
+  .ghg-stack{ display:flex; height:40px; border-radius:10px; overflow:hidden; margin-top:14px; }
+  .ghg-stack .seg{ display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:700; min-width:0; }
+  .ghg-total{
+    margin-top:12px; padding:14px 16px; border-radius:12px; font-size:13.5px; font-weight:600;
+    background:color-mix(in srgb, var(--good) 12%, var(--paper)); color:var(--ink); border:1px solid color-mix(in srgb, var(--good) 30%, var(--line));
+    display:flex; align-items:center; gap:10px;
+  }
+  .ghg-total b{ font-size:15px; }
+
+  /* module cards */
+  .modules-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media (max-width:1080px){ .modules-grid{ grid-template-columns:1fr; } }
+  .module-card{ padding:20px 22px 22px; }
+  .module-head{ display:flex; align-items:flex-start; gap:12px; }
+  .module-head .mi{ font-size:26px; flex:none; }
+  .module-head h3{ font-size:16px; }
+  .module-head p{ font-size:12px; color:var(--ink-soft); margin:3px 0 0; }
+  .module-tags{ display:flex; gap:6px; margin-top:8px; }
+  .tag-chip{ font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:20px; background:var(--line-soft); color:var(--ink-soft); }
+  .tag-chip.status-done{ background:var(--good); color:#fff; }
+  .tag-chip.status-pending{ background:color-mix(in srgb, var(--warn) 20%, transparent); color:var(--warn); }
+  .module-status-row{ margin-left:auto; text-align:right; }
+
+  .tabbar{ display:flex; gap:2px; margin-top:16px; background:var(--line-soft); border-radius:10px; padding:3px; }
+  .tabbar button{ flex:1; border:none; background:none; font-size:12.5px; font-weight:600; color:var(--ink-soft); padding:8px 4px; border-radius:8px; cursor:pointer; }
+  .tabbar button.active{ background:var(--paper); color:var(--ink); box-shadow:0 1px 2px rgba(20,30,28,0.08); }
+  .tabpane{ display:none; margin-top:16px; }
+  .tabpane.active{ display:block; }
+
+  .frow{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .f{ font-size:11.5px; }
+  .f label{ display:block; color:var(--ink-soft); margin-bottom:4px; }
+  .f label .req{ color:var(--bad); }
+  .f input, .f select, .f textarea{
+    width:100%; font:inherit; font-size:13px; color:var(--ink); background:var(--line-soft); border:1px solid transparent;
+    border-radius:8px; padding:8px 10px;
+  }
+  .f input:focus, .f select:focus, .f textarea:focus{ background:var(--paper); border-color:var(--g2); outline:none; }
+  .f textarea{ resize:vertical; min-height:52px; }
+
+  .weight-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }
+  .wchip{ background:var(--line-soft); border-radius:10px; padding:10px; text-align:center; }
+  .wchip label{ font-size:11px; color:var(--ink-soft); display:block; margin-bottom:4px; }
+  .wchip input{
+    width:100%; text-align:center; font:inherit; font-size:15px; font-weight:600; color:var(--ink);
+    background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:5px 2px;
+  }
+  .wchip .u{ font-size:10px; color:var(--ink-soft); margin-top:2px; }
+  .wtotal{ display:flex; justify-content:space-between; align-items:center; background:var(--line-soft); border-radius:10px; padding:12px 14px; margin:6px 0 12px; }
+  .wtotal .wl{ font-size:12px; color:var(--ink-soft); }
+  .wtotal .wv{ font-size:19px; font-weight:700; color:var(--g2); }
+
+  .form-actions{ display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .btn{ font-size:12.5px; font-weight:600; padding:10px 16px; cursor:pointer; border-radius:10px; border:none; background:linear-gradient(100deg, var(--g1), var(--g2)); color:#fff; }
+  .btn:hover{ filter:brightness(1.06); }
+  .btn.secondary{ background:var(--line-soft); color:var(--ink); border:1px solid var(--line); }
+  .btn.secondary:hover{ border-color:var(--g2); color:var(--g2); }
+  .btn.ocr{ background:var(--paper); color:var(--g2); border:1px solid var(--g2); }
+  .req-note{ font-size:10.5px; color:var(--ink-soft); margin-left:auto; }
+  .form-msg{ font-size:11.5px; color:var(--good); font-weight:600; }
+
+  /* OCR (embedded per-tab) */
+  .ocr-box{ margin-top:8px; }
+  .ocr-drop{ border:2px dashed var(--line); border-radius:12px; padding:20px; text-align:center; cursor:pointer; }
+  .ocr-drop:hover, .ocr-drop.drag{ border-color:var(--g2); background:var(--line-soft); }
+  .ocr-drop .oi{ font-size:22px; }
+  .ocr-drop .ot{ font-size:11.5px; color:var(--ink-soft); margin-top:6px; }
+  .ocr-status{ font-size:12px; color:var(--ink-soft); margin-top:10px; display:flex; align-items:center; gap:8px; }
+  .ocr-spinner{ width:13px; height:13px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--g2); animation:spin .8s linear infinite; flex:none; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .ocr-raw{ font-family:monospace; font-size:10.5px; color:var(--ink-soft); background:var(--line-soft); border-radius:8px; padding:8px 10px; max-height:90px; overflow-y:auto; white-space:pre-wrap; margin-top:8px; }
+  details.ocr-raw-toggle summary{ font-size:11px; color:var(--g2); cursor:pointer; margin-top:6px; }
+  .ocr-conf{ font-size:10.5px; color:var(--ink-soft); margin-top:4px; }
+
+  /* supply chain ledger (spreadsheet-style) */
+  .col-co2{ text-align:right; white-space:nowrap; font-weight:700; color:var(--g2); }
+  .col-rm{ width:28px; text-align:center; }
+  .rm-btn{ background:none; border:1px solid var(--line); color:var(--ink-soft); width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:12px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .rm-btn:hover{ color:var(--bad); border-color:var(--bad); }
+  .factor-cell{ display:flex; align-items:center; gap:4px; }
+  .factor-cell input{ flex:1; }
+  .factor-cell a{ flex:none; text-decoration:none; }
+  .src-tag{ display:inline-block; font-size:10px; font-weight:600; padding:3px 8px; border-radius:20px; background:var(--line-soft); color:var(--ink-soft); white-space:nowrap; }
+  .src-tag.primary{ color:#fff; background:linear-gradient(100deg, var(--g1), var(--g2)); }
+  .dev-badge{ font-size:10px; white-space:nowrap; font-weight:600; }
+  .dev-badge.better{ color:var(--good); } .dev-badge.worse{ color:var(--bad); } .dev-badge.neutral{ color:var(--ink-soft); font-weight:400; }
+  #supply-body td{ padding:6px 10px; }
+  #supply-body input, #supply-body select{ font:inherit; font-size:12.5px; color:var(--ink); background:transparent; border:none; padding:5px 4px; width:100%; border-radius:6px; }
+  #supply-body input:focus, #supply-body select:focus{ background:var(--line-soft); outline:none; }
+  #supply-body input[type="number"]{ text-align:right; }
+
+  /* donut + contributors (dashboard) */
+  .donut{ width:150px; height:150px; border-radius:50%; flex:none; position:relative; }
+  .donut-center{ position:absolute; inset:20px; border-radius:50%; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .donut-center .n{ font-size:18px; font-weight:700; color:var(--ink); line-height:1.1; }
+  .donut-center .u{ font-size:9px; color:var(--ink-soft); margin-top:2px; }
+  .legend{ flex:1; display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .legend-row{ display:flex; align-items:center; gap:8px; font-size:11.5px; }
+  .legend-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .legend-name{ flex:1; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .legend-val{ color:var(--ink-soft); font-size:11px; flex:none; }
+  .contrib-row{ display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--line-soft); }
+  .contrib-row:last-child{ border-bottom:none; }
+  .contrib-rank{ width:16px; flex:none; font-size:10.5px; font-weight:700; color:var(--ink-soft); }
+  .contrib-name{ width:36%; flex:none; font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .contrib-track{ flex:1; height:11px; background:var(--line-soft); border-radius:6px; overflow:hidden; }
+  .contrib-fill{ height:100%; border-radius:6px; }
+  .contrib-val{ width:70px; flex:none; text-align:right; font-size:11px; color:var(--ink-soft); }
+
+  /* history table */
+  .hist-toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .hist-toolbar select{ font:inherit; font-size:12.5px; padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-weight:600; font-size:11px; color:var(--ink-soft); padding:11px 12px; border-bottom:1px solid var(--line); white-space:nowrap; background:var(--line-soft); }
+  tbody td{ padding:10px 12px; border-bottom:1px solid var(--line-soft); font-size:12.5px; vertical-align:middle; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:var(--line-soft); }
+  .mod-badge{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; background:var(--line-soft); white-space:nowrap; }
+  .status-badge{ font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+  .status-badge.verified{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+  .status-badge.manager{ background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
+  .status-badge.pending{ background:var(--line-soft); color:var(--ink-soft); }
+  .hist-empty{ padding:30px; text-align:center; font-size:13px; color:var(--ink-soft); }
+  .hist-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px; color:var(--ink-soft); }
+
+  /* erp / factors (reused) */
+  .erp-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:14px; }
+  .erp-card{ overflow:hidden; }
+  .erp-card::before{ content:""; display:block; height:5px; background:linear-gradient(100deg, var(--g1), var(--g2)); }
+  .erp-card > *{ padding-left:18px; padding-right:18px; }
+  .erp-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-top:14px; }
+  .erp-head .k{ font-size:10.5px; font-weight:700; color:var(--g2); }
+  .erp-card h3{ font-size:14.5px; margin:5px 0 4px; }
+  .erp-card p{ font-size:12px; color:var(--ink-soft); margin:0; }
+  .erp-dot{ width:8px; height:8px; border-radius:50%; flex:none; margin-top:3px; }
+  .erp-dot.off{ background:var(--line); } .erp-dot.on{ background:var(--good); }
+  .erp-connect{ margin:12px 0 16px; font-size:11.5px; font-weight:600; padding:7px 14px; border-radius:20px; cursor:pointer; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
+  .erp-connect.connected{ background:var(--good); border-color:var(--good); color:#fff; }
+  .note{ font-size:11.5px; color:var(--ink-soft); margin-top:10px; max-width:700px; }
+  .note b{ color:var(--ink); }
+
+  .export-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .export-msg{ font-size:11.5px; color:var(--ink-soft); }
+
+  footer{ margin-top:48px; padding-top:16px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-soft); }
+
+  @media (max-width:940px){
+    .shell{ flex-direction:column; }
+    .rail{ position:relative; width:100%; height:auto; }
+    .rail nav{ flex-direction:row; flex-wrap:wrap; }
+    .main{ padding:20px 16px 60px; }
+    .frow{ grid-template-columns:1fr; }
+    .weight-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-mark">H&nbsp;HEALL</div>
+    <div class="tag">Health &amp; Environment Analytics<br>ปีงบประมาณ 2568 · คณะแพทยศาสตร์ศิริราชพยาบาล</div>
+    <div class="rail-h" style="margin-top:0;">ภาพรวม</div>
+    <nav>
+      <a href="#dashboard" data-page="dashboard" class="active">📊 Dashboard</a>
+      <a href="#" class="disabled" title="ยังไม่เปิดใช้งาน">📋 รายงาน CFO</a>
+    </nav>
+
+    <div class="rail-h">บันทึกข้อมูล — แบ่งตาม Scope</div>
+
+    <div class="scope-group">
+      <div class="scope-head"><span class="scope-dot s1"></span>Scope 1 <span class="scope-sub">การเผาไหม้ทางตรง</span><span class="scope-total" id="scope1-total">—</span></div>
+      <nav>
+        <a href="#" class="disabled" title="เร็วๆ นี้">⛽ เชื้อเพลิง</a>
+      </nav>
+    </div>
+
+    <div class="scope-group">
+      <div class="scope-head"><span class="scope-dot s2"></span>Scope 2 <span class="scope-sub">พลังงานที่ซื้อ</span><span class="scope-total" id="scope2-total">—</span></div>
+      <nav>
+        <a href="#" class="disabled" title="เร็วๆ นี้">⚡ ไฟฟ้า</a>
+      </nav>
+    </div>
+
+    <div class="scope-group">
+      <div class="scope-head"><span class="scope-dot s3"></span>Scope 3 <span class="scope-sub">ห่วงโซ่คุณค่า</span><span class="scope-total" id="scope3-total">—</span></div>
+      <nav>
+        <a href="#entry" data-page="entry">🛒 Supply Chain <span class="scope-tag">Cat.1</span></a>
+        <a href="#entry" data-page="entry">💧 น้ำ <span class="scope-tag">3.1</span></a>
+        <a href="#entry" data-page="entry">🗑️ ขยะ <span class="scope-tag">3.5</span></a>
+        <a href="#entry" data-page="entry">⬆️ ช่องทางอัปโหลด</a>
+      </nav>
+    </div>
+
+    <div class="rail-h">ข้อมูลหลัก</div>
+    <nav>
+      <a href="#history" data-page="entry">📜 ประวัติการบันทึก</a>
+      <a href="#erp" data-page="entry">🔗 ERP &amp; Supply Chain</a>
+      <a href="#factors" data-page="entry">🔢 Emission Factors</a>
+      <a href="#" class="disabled" title="เร็วๆ นี้">📍 จุดพักขยะ</a>
+    </nav>
+    <div class="rail-h">ระบบ</div>
+    <nav>
+      <a href="#export" data-page="entry">📥 Export</a>
+      <a href="#" class="disabled" title="เร็วๆ นี้">⚙️ ตั้งค่า</a>
+    </nav>
+    <div class="rail-foot">ข้อมูลทั้งหมดเก็บในเบราว์เซอร์นี้เท่านั้น (localStorage) — ยังไม่เชื่อมฐานข้อมูลกลาง</div>
+  </aside>
+
+  <main class="main">
+    <div class="top-bar">
+      <div>
+        <span class="pill on" style="margin-bottom:8px; display:inline-block;">SCOPE 3 · WASTE &amp; WATER</span>
+        <h1>Waste Generation &amp; Water Consumption</h1>
+        <div class="sub">อ้างอิงโครงสร้างจริงจาก <a href="https://beewisehct-beep.github.io/Scope3_HEALL/" target="_blank" rel="noopener">HEALL Platform (GitHub)</a> · OCR ทำงานในเบราว์เซอร์จริง ไม่มีเซิร์ฟเวอร์กลาง</div>
+      </div>
+      <div class="field-strip">
+        <div class="mfield"><label>สังกัดหลัก</label><input id="f-facility" value="ศิริราช + คณะ"></div>
+        <div class="mfield"><label>เดือน/งวด</label><input id="f-period" value="พฤศจิกายน 2568"></div>
+      </div>
+    </div>
+
+    <div id="page-dashboard">
+    <section id="dashboard" style="margin-top:24px;">
+      <div class="pill-row">
+        <span class="pill on">3.1 น้ำประปา</span>
+        <span class="pill on">3.5 ขยะ</span>
+        <span class="pill off">3.13 ผู้เช่า</span>
+        <span class="pill off">Category 1 · จัดซื้อ</span>
+        <span class="banner" id="status-banner">กำลังบันทึกข้อมูล: <span id="banner-period">พฤศจิกายน 2568</span> · <span id="banner-facility">ศิริราช + คณะ</span></span>
+        <button class="btn" id="cta-add-data" style="flex:none;">+ เพิ่มข้อมูล</button>
+      </div>
+
+      <div class="kpi-row">
+        <div class="card kpi-card">
+          <div class="kpi-lbl">🗑️ ขยะรวมงวดนี้</div>
+          <div class="kpi-val"><span id="kpi-waste-total">0</span> <small>kg</small></div>
+          <div class="kpi-delta" id="kpi-waste-delta">—</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-lbl">💧 น้ำประปารวมงวดนี้</div>
+          <div class="kpi-val"><span id="kpi-water-total">0</span> <small>ลบ.ม.</small></div>
+          <div class="kpi-delta" id="kpi-water-delta">—</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-lbl">🛒 Supply Chain รวมงวดนี้</div>
+          <div class="kpi-val"><span id="kpi-supply-total">0</span> <small>kg CO₂e</small></div>
+          <div class="kpi-sub2" id="kpi-supply-lines">0 รายการ</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-lbl">🌍 GHG Scope 3 รวม</div>
+          <div class="kpi-val"><span id="kpi-total">0</span> <small>tCO₂eq</small></div>
+          <div class="kpi-delta" id="kpi-target-delta">—</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-lbl">Primary data coverage</div>
+          <div class="kpi-val"><span id="kpi-primary-pct">0</span><small>%</small></div>
+          <div class="kpi-sub2" id="kpi-primary-sub">0 of 0 supply-chain lines verified</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-lbl">สถานะการบันทึก (งวดนี้)</div>
+          <div class="kpi-checklist">
+            <span class="chk" id="chk-waste">⏳ ขยะ</span>
+            <span class="chk" id="chk-water">⏳ น้ำ</span>
+            <span class="chk" id="chk-supply">⏳ จัดซื้อ</span>
+          </div>
+          <div class="kpi-sub2" id="kpi-module-count">ครบ 0/3 โมดูล</div>
+        </div>
+      </div>
+
+      <div class="chart-row" style="display:grid; grid-template-columns:1fr 1.15fr; gap:16px; margin-top:16px;">
+        <div class="card chart-card" style="padding:20px 22px;">
+          <div class="panel-h" style="font-weight:700; font-size:14px;">By category</div>
+          <div class="panel-sub" style="font-size:11.5px; color:var(--ink-soft); margin-bottom:14px;">สัดส่วนทั้งหมด — น้ำ + ขยะ + จัดซื้อ</div>
+          <div class="donut-wrap" id="donut-wrap" style="display:flex; align-items:center; gap:22px;">
+            <div class="hist-empty">ยังไม่มีข้อมูล</div>
+          </div>
+        </div>
+        <div class="card chart-card" style="padding:20px 22px;">
+          <div class="panel-h" style="font-weight:700; font-size:14px;">Highest contributors</div>
+          <div class="panel-sub" style="font-size:11.5px; color:var(--ink-soft); margin-bottom:14px;">รวมทุกโมดูล จัดอันดับตาม kg CO₂e</div>
+          <div id="contrib-box"><div class="hist-empty">ยังไม่มีข้อมูล</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px 22px; margin-top:16px;">
+        <div class="sec-label" style="margin-bottom:2px;">🌍 สรุป GHG Scope 3</div>
+        <h2 style="font-size:16px;">คำนวณอัตโนมัติ — <span id="ghg-period-label">พฤศจิกายน 2568</span></h2>
+        <p class="lead" style="margin-top:6px;">
+          เป้าปี 2568: <input id="target-input" type="number" min="0" step="0.1" value="3297.8" style="width:80px; border:none; border-bottom:1px dashed var(--line); background:transparent; font:inherit; color:var(--ink);"> tCO₂eq/ปี ·
+          baseline เปรียบเทียบ: <input id="baseline-input" type="number" min="0" step="0.1" placeholder="tCO2eq" style="width:80px; border:none; border-bottom:1px dashed var(--line); background:transparent; font:inherit; color:var(--ink);">
+        </p>
+        <div id="ghg-formula-box"><div class="hist-empty">ยังไม่มีข้อมูล — บันทึกในโมดูลด้านล่างเพื่อดูสรุป</div></div>
+      </div>
+    </section>
+    </div>
+
+    <div id="page-entry" style="display:none;">
+    <div class="card" style="padding:12px 18px; margin-top:20px; display:flex; align-items:center; gap:12px;">
+      <a href="#" id="back-to-dashboard" style="font-size:13px; font-weight:600;">← กลับไป Dashboard</a>
+      <span style="font-size:11.5px; color:var(--ink-soft);">บันทึกข้อมูล Supply Chain / ขยะ / น้ำ ที่นี่ — กลับไปดูสรุปที่ Dashboard เมื่อบันทึกเสร็จ</span>
+    </div>
+
+    <section id="entry">
+      <div class="sec-label">Data entry</div>
+      <h2>โมดูลบันทึกข้อมูล</h2>
+      <p class="lead">เลือกประเภทข้อมูลที่ต้องการบันทึก — รองรับ OCR จากภาพถ่ายและ PDF (ประมวลผลในเบราว์เซอร์ ไม่ส่งรูปออกไปที่ไหน)</p>
+
+      <!-- SUPPLY CHAIN MODULE (full width, spreadsheet-style like Category 1 procurement) -->
+      <div class="card module-card" style="margin-bottom:18px;">
+        <div class="module-head">
+          <div class="mi">🛒</div>
+          <div>
+            <h3>Supply Chain — Purchased Goods</h3>
+            <p>ยา / PPE / เคมี / อุปกรณ์การแพทย์ / วัสดุสิ้นเปลือง — ป้อนทีละรายการ แต่ละแถวคำนวณ CO₂e ทันที</p>
+            <div class="module-tags"><span class="tag-chip">Category 1</span><span class="tag-chip" id="supply-status-chip">⏳ รอกรอก</span></div>
+          </div>
+        </div>
+        <div style="overflow-x:auto; margin-top:16px;">
+          <table>
+            <colgroup>
+              <col style="width:18%"><col style="width:14%"><col style="width:16%"><col style="width:8%">
+              <col style="width:10%"><col style="width:6%"><col style="width:10%"><col style="width:12%"><col style="width:4%">
+            </colgroup>
+            <thead>
+              <tr><th>Item</th><th>Supplier</th><th>Category</th><th>Qty (kg)</th><th>Factor</th><th></th><th>Source</th><th style="text-align:right;">Est. CO₂e (kg)</th><th></th></tr>
+            </thead>
+            <tbody id="supply-body"></tbody>
+          </table>
+        </div>
+        <div class="form-actions" style="margin-top:12px;">
+          <button class="btn secondary" id="supply-add-row" type="button">+ add stock line</button>
+          <span class="req-note">estimated total: <b id="supply-total" style="color:var(--g2); font-size:15px;">0</b> kg CO₂e</span>
+        </div>
+        <p class="note">ค่าเริ่มต้น (factor) เป็นค่าประมาณ — คลิก 🔎 เพื่อค้นหาค่าจริงจาก <a href="https://www.medzerocarbon.com/" target="_blank" rel="noopener">Lancet MedZero</a> แล้วแก้ในช่อง Factor (จะถูกทำเครื่องหมายเป็น "Primary" อัตโนมัติ) — ใบอนุญาตของ MedZero เป็น CC BY-NC-SA (NonCommercial) ตรวจสอบก่อนใช้ในผลิตภัณฑ์เชิงพาณิชย์ขนาดใหญ่</p>
+      </div>
+
+      <div class="modules-grid">
+        <!-- WASTE MODULE -->
+        <div class="card module-card">
+          <div class="module-head">
+            <div class="mi">🗑️</div>
+            <div>
+              <h3>ขยะ — Waste</h3>
+              <p>บันทึกน้ำหนักขยะรายวัน + ใบแจ้งหนี้ส่งกำจัด + รีไซเคิล</p>
+              <div class="module-tags"><span class="tag-chip">Scope 3.5</span><span class="tag-chip" id="waste-status-chip">⏳ รอกรอก</span></div>
+            </div>
+          </div>
+
+          <div class="tabbar" id="waste-tabbar">
+            <button class="active" data-tab="waste-daily">รายวัน</button>
+            <button data-tab="waste-invoice">ใบแจ้งหนี้</button>
+            <button data-tab="waste-recycle">รีไซเคิล</button>
+          </div>
+
+          <div class="tabpane active" id="waste-daily">
+            <div class="frow">
+              <div class="f"><label>วันที่ <span class="req">*</span></label><input type="date" id="wd-date"></div>
+              <div class="f"><label>รอบการเก็บ <span class="req">*</span></label>
+                <select id="wd-round"><option value="เช้า">เช้า (06:00–14:00)</option><option value="บ่าย">บ่าย (14:00–22:00)</option><option value="ดึก">ดึก (22:00–06:00)</option></select>
+              </div>
+            </div>
+            <div class="frow">
+              <div class="f"><label>สังกัด <span class="req">*</span></label><select id="wd-affil"></select></div>
+              <div class="f"><label>จุดพักขยะ</label>
+                <select id="wd-point"><option>โภชนาการ</option><option>ตึกจุลชีววิทยา</option><option>ตึกอุบัติเหตุ</option><option>ตึกนวมินทรบพิตร 84 พรรษา</option><option>— จุดพักอื่นๆ —</option></select>
+              </div>
+            </div>
+            <div class="f"><label>น้ำหนักขยะแต่ละประเภท (kg) <span class="req">*</span></label></div>
+            <div class="weight-grid">
+              <div class="wchip"><label>แห้ง</label><input type="number" min="0" class="wd-w" data-k="dry" value="0"><div class="u">kg</div></div>
+              <div class="wchip"><label>เปียก</label><input type="number" min="0" class="wd-w" data-k="wet" value="0"><div class="u">kg</div></div>
+              <div class="wchip"><label>ติดเชื้อ</label><input type="number" min="0" class="wd-w" data-k="inf" value="0"><div class="u">kg</div></div>
+              <div class="wchip"><label>อันตราย</label><input type="number" min="0" class="wd-w" data-k="haz" value="0"><div class="u">kg</div></div>
+              <div class="wchip"><label>เคมีบำบัด</label><input type="number" min="0" class="wd-w" data-k="chem" value="0"><div class="u">kg</div></div>
+              <div class="wchip"><label>รีไซเคิล</label><input type="number" min="0" class="wd-w" data-k="rec" value="0"><div class="u">kg</div></div>
+            </div>
+            <div class="wtotal"><span class="wl">น้ำหนักรวม (auto)</span><span class="wv" id="wd-total">0 kg</span></div>
+            <div class="form-actions">
+              <button class="btn" id="wd-save">💾 บันทึกข้อมูล</button>
+              <button class="btn secondary" id="wd-clear" type="button">ล้างข้อมูล</button>
+              <span class="req-note">* จำเป็นต้องกรอก</span>
+            </div>
+            <div class="form-msg" id="wd-msg"></div>
+          </div>
+
+          <div class="tabpane" id="waste-invoice">
+            <p class="lead" style="margin-bottom:10px;">ถ่ายรูปหรืออัปโหลดใบแจ้งหนี้บริษัทกำจัดขยะ — รองรับ JPG, PDF (รูป) · สูงสุด 10 MB</p>
+            <div class="ocr-box" id="ocr-waste"></div>
+          </div>
+
+          <div class="tabpane" id="waste-recycle">
+            <p class="lead" style="margin-bottom:10px;">ข้อมูลจากธนาคารขยะรีไซเคิล หรือกรอกเอง (kg/เดือน)</p>
+            <div class="frow">
+              <div class="f"><label>กล่องกระดาษ</label><input type="number" min="0" id="wr-box" value="0"></div>
+              <div class="f"><label>ขวดน้ำ PET</label><input type="number" min="0" id="wr-pet" value="0"></div>
+              <div class="f"><label>พลาสติกรวม</label><input type="number" min="0" id="wr-plastic" value="0"></div>
+              <div class="f"><label>ขวดแก้ว</label><input type="number" min="0" id="wr-glass" value="0"></div>
+              <div class="f"><label>กระป๋องอะลูมิเนียม</label><input type="number" min="0" id="wr-can" value="0"></div>
+              <div class="f"><label>อื่นๆ</label><input type="number" min="0" id="wr-other" value="0"></div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" id="wr-save">💾 บันทึกข้อมูลรีไซเคิล</button>
+              <button class="btn secondary" id="wr-clear" type="button">ล้างข้อมูล</button>
+            </div>
+            <div class="form-msg" id="wr-msg"></div>
+          </div>
+        </div>
+
+        <!-- WATER MODULE -->
+        <div class="card module-card">
+          <div class="module-head">
+            <div class="mi">💧</div>
+            <div>
+              <h3>น้ำ — Water</h3>
+              <p>มาตรวัดน้ำรายเดือน + บำบัดน้ำเสีย + รีไซเคิลน้ำ</p>
+              <div class="module-tags"><span class="tag-chip">Scope 3.1</span><span class="tag-chip" id="water-status-chip">⏳ รอกรอก</span></div>
+            </div>
+          </div>
+
+          <div class="tabbar" id="water-tabbar">
+            <button class="active" data-tab="water-meter">มาตรวัดน้ำ</button>
+            <button data-tab="water-treat">บำบัดน้ำเสีย</button>
+          </div>
+
+          <div class="tabpane active" id="water-meter">
+            <div class="frow">
+              <div class="f"><label>เดือน <span class="req">*</span></label><input type="text" id="wm-month" placeholder="พฤศจิกายน 2568"></div>
+              <div class="f"><label>วันที่อ่านมาตร <span class="req">*</span></label><input type="date" id="wm-date"></div>
+            </div>
+            <div class="frow">
+              <div class="f"><label>ประตู 5 (เลขสะสม, ลบ.ม.)</label><input type="number" min="0" id="wm-gate5" value="0"></div>
+              <div class="f"><label>ตึกสยามินทร์ (ลบ.ม.)</label><input type="number" min="0" id="wm-siam" value="0"></div>
+            </div>
+            <div class="frow">
+              <div class="f"><label>หัก SiPH (ลบ.ม.)</label><input type="number" min="0" id="wm-siph" value="0"></div>
+              <div class="f"><label>หัก เทคนิคการแพทย์ (ลบ.ม.)</label><input type="number" min="0" id="wm-tech" value="0"></div>
+            </div>
+            <div class="wtotal"><span class="wl">รวมทั้งหมด (auto) = (ประตู5 − SiPH − เทคนิคฯ) + สยามินทร์</span><span class="wv" id="wm-total">0 ลบ.ม.</span></div>
+            <div class="frow">
+              <div class="f"><label>ค่าน้ำ (บาท) <span class="req">*</span></label><input type="number" min="0" id="wm-cost"></div>
+              <div class="f"><label>เลขที่ใบแจ้งหนี้ประปา</label><input type="text" id="wm-invno"></div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" id="wm-save">💾 บันทึกข้อมูลน้ำ</button>
+              <button class="btn secondary" id="wm-clear" type="button">ล้างข้อมูล</button>
+              <span class="req-note">* จำเป็นต้องกรอก</span>
+            </div>
+            <div class="form-msg" id="wm-msg"></div>
+            <details class="ocr-raw-toggle" style="margin-top:10px;"><summary>📸 OCR ใบแจ้งหนี้ประปา</summary>
+              <div class="ocr-box" id="ocr-water" style="margin-top:8px;"></div>
+            </details>
+          </div>
+
+          <div class="tabpane" id="water-treat">
+            <p class="lead" style="margin-bottom:10px;">ข้อมูลระบบบำบัดน้ำเสีย (ลูกบาศก์เมตร/เดือน)</p>
+            <div class="frow">
+              <div class="f"><label>น้ำเข้าระบบ (ลบ.ม.) <span class="req">*</span></label><input type="number" min="0" id="wt-in"></div>
+              <div class="f"><label>น้ำทิ้งออก (ลบ.ม.) <span class="req">*</span></label><input type="number" min="0" id="wt-out"></div>
+            </div>
+            <div class="frow">
+              <div class="f"><label>น้ำรีไซเคิล (ลบ.ม.)</label><input type="number" min="0" id="wt-recycle" value="0"></div>
+              <div class="f"><label>% Recovery (auto)</label><input type="text" id="wt-recovery" disabled placeholder="auto calc"></div>
+            </div>
+            <div class="frow">
+              <div class="f"><label>pH น้ำทิ้ง</label><input type="text" id="wt-ph" placeholder="6.0–8.0"></div>
+              <div class="f"><label>BOD น้ำทิ้ง (mg/L)</label><input type="text" id="wt-bod" placeholder="ตามมาตรฐาน"></div>
+            </div>
+            <div class="f" style="margin-bottom:10px;"><label>หมายเหตุ / ผลวิเคราะห์คุณภาพน้ำ</label><textarea id="wt-notes"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" id="wt-save">💾 บันทึกข้อมูลบำบัดน้ำเสีย</button>
+              <button class="btn secondary" id="wt-clear" type="button">ล้างข้อมูล</button>
+            </div>
+            <div class="form-msg" id="wt-msg"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="history">
+      <div class="sec-label">ข้อมูลหลัก</div>
+      <h2>ประวัติการบันทึกล่าสุด</h2>
+      <div class="card" style="padding:20px 22px;">
+        <div class="hist-toolbar">
+          <select id="hist-filter">
+            <option value="">ทุกเดือน</option>
+          </select>
+          <button class="btn secondary" id="hist-export">📥 Export Excel (CSV)</button>
+          <span class="export-msg" id="hist-msg"></span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>วันที่</th><th>โมดูล</th><th>สังกัด</th><th>รายละเอียด</th><th>น้ำหนัก/ปริมาณ</th><th>GHG (tCO₂eq)</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
+        <div class="hist-foot">
+          <span id="hist-count">แสดง 0 รายการ</span>
+          <a href="#" id="hist-toggle">ดูทั้งหมด →</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="erp">
+      <div class="sec-label">ข้อมูลหลัก</div>
+      <h2>🔗 ERP &amp; Supply Chain</h2>
+      <p class="lead">การเชื่อมต่อระบบที่จะดึงข้อมูลน้ำ/ขยะ/จัดซื้อเข้ามาอัตโนมัติในอนาคต — ตอนนี้ยังเป็นการกรอกมือทั้งหมด ปุ่ม "เชื่อมต่อ" ด้านล่างเป็น UI เตรียมไว้สำหรับต่อ API จริง ยังไม่มีการดึงข้อมูลจริงเกิดขึ้น</p>
+      <div class="erp-grid" id="erp-grid"></div>
+      <p class="note"><b>เรื่องความจริงใจ:</b> สถานะการเชื่อมต่อเก็บใน localStorage ของเบราว์เซอร์นี้เท่านั้น ไม่ได้เชื่อมต่อ MediCORE, Roots ERP หรือระบบใดจริง</p>
+    </section>
+
+    <section id="factors">
+      <div class="sec-label">ข้อมูลหลัก</div>
+      <h2>🔢 Emission Factors</h2>
+      <p class="lead">ค่าที่ใช้อยู่ในตอนนี้ — น้ำและขยะอ้างอิงจาก HEALL Platform จริง</p>
+      <div class="card" style="overflow:hidden;">
+        <table>
+          <colgroup><col style="width:34%"><col style="width:16%"><col style="width:16%"><col style="width:34%"></colgroup>
+          <thead><tr><th>หมวด</th><th>Factor</th><th>หน่วย</th><th>ที่มา</th></tr></thead>
+          <tbody id="factors-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="export">
+      <div class="sec-label">ระบบ</div>
+      <h2>Export &amp; report</h2>
+      <p class="lead">ดึงข้อมูลทุกรายการออกเป็น CSV</p>
+      <div class="export-row">
+        <button class="btn" id="export-csv">Download ทั้งหมดเป็น CSV</button>
+        <button class="btn secondary" id="copy-csv">Copy as CSV</button>
+        <span class="export-msg" id="export-msg"></span>
+      </div>
+    </section>
+
+    <footer>HEALL — Scope 3 Data Collection · โครงสร้างอ้างอิงจาก HEALL Platform จริง · OCR ทำงานในเบราว์เซอร์ (Tesseract.js) · ค่าตัวเลขทั้งหมดเป็นค่าประมาณ ยังไม่ผ่านการตรวจสอบ</footer>
+    </div><!-- /page-entry -->
+  </main>
+</div>
+
+<script>
+(function(){
+  var AFFILIATIONS = ["ศิริราช","ศิริราชปิยมหาราชการุณย์","คณะพยาบาลศาสตร์","คณะเทคนิคการแพทย์"];
+  var CATS = [
+    {key:"water",     label:"น้ำประปา (Scope 3.1)",           factor:0.7944, unit:"ลบ.ม.", source:"HEALL Platform (live)", color:"var(--chip2)"},
+    {key:"waste_gen", label:"ขยะทั่วไป + อันตราย (Scope 3.5)", factor:0.794,  unit:"kg",    source:"HEALL Platform (live)", color:"var(--chip1)"},
+    {key:"waste_inf", label:"ขยะติดเชื้อ (Scope 3.5)",         factor:0.619,  unit:"kg",    source:"HEALL Platform (live)", color:"var(--chip4)"},
+    {key:"pharma", label:"Pharmaceuticals & medicines (ext.)", factor:4.5, unit:"kg", source:"illustrative — verify via MedZero", color:"var(--chip6)"},
+    {key:"ppe",    label:"PPE & disposable plastics (ext.)",   factor:2.9, unit:"kg", source:"illustrative — verify via MedZero", color:"var(--chip5)"},
+    {key:"chem",   label:"Lab chemicals & reagents (ext.)",    factor:3.8, unit:"kg", source:"illustrative — verify via MedZero", color:"var(--chip3)"},
+    {key:"device", label:"Medical devices & equipment (ext.)", factor:6.2, unit:"kg", source:"illustrative — verify via MedZero", color:"#7C9CBF"},
+    {key:"consum", label:"General consumables & paper (ext.)", factor:1.4, unit:"kg", source:"illustrative — verify via MedZero", color:"#B8A9C9"}
+  ];
+  var SUPPLY_CAT_KEYS = ["pharma","ppe","chem","device","consum"];
+  function catByKey(k){ for (var i=0;i<CATS.length;i++){ if (CATS[i].key===k) return CATS[i]; } return CATS[0]; }
+  function resolveColor(v){ if (v.indexOf("var(")!==0) return v; return getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim(); }
+
+  var RECORDS_KEY = "heall_scope3_records_v1";
+  function loadRecords(){ try{ var raw = localStorage.getItem(RECORDS_KEY); return raw ? JSON.parse(raw) : []; } catch(e){ return []; } }
+  function saveRecords(list){ try{ localStorage.setItem(RECORDS_KEY, JSON.stringify(list)); return true; } catch(e){ return false; } }
+  var records = loadRecords();
+  var showAllHistory = false;
+
+  // ---------- Supply Chain (Category 1) — spreadsheet-style ledger ----------
+  var SUPPLY_KEY = "heall_supply_rows_v1";
+  var supplyRowId = 0;
+  function loadSupply(){ try{ var raw = localStorage.getItem(SUPPLY_KEY); return raw ? JSON.parse(raw) : null; } catch(e){ return null; } }
+  function saveSupply(){
+    var out = [];
+    document.querySelectorAll("#supply-body tr").forEach(function(tr){ out.push(supplyRowData(tr)); });
+    try{ localStorage.setItem(SUPPLY_KEY, JSON.stringify(out)); } catch(e){}
+  }
+  var SUPPLY_STARTER = [
+    {item:"Paracetamol 500mg (stock)", supplier:"Central Pharma Co.", cat:"pharma", qty:120},
+    {item:"Nitrile exam gloves, box stock", supplier:"MedSupply Thailand", cat:"ppe", qty:340},
+    {item:"Blood-gas reagent kits", supplier:"Roche Diagnostics", cat:"chem", qty:38, factor:4.4},
+    {item:"IV cannulas, disposable", supplier:"MedSupply Thailand", cat:"consum", qty:210}
+  ];
+
+  function addRecord(rec){
+    rec.id = "r" + Date.now() + Math.random().toString(36).slice(2,7);
+    rec.ts = Date.now();
+    records.unshift(rec);
+    saveRecords(records);
+    renderAll();
+  }
+
+  function buildSupplyRow(data){
+    supplyRowId++;
+    var tr = document.createElement("tr");
+    var tdItem = document.createElement("td");
+    var itemInput = document.createElement("input");
+    itemInput.type = "text"; itemInput.value = data.item || ""; itemInput.placeholder = "stock item name";
+    tdItem.appendChild(itemInput);
+
+    var tdSupplier = document.createElement("td");
+    var supplierInput = document.createElement("input");
+    supplierInput.type = "text"; supplierInput.value = data.supplier || ""; supplierInput.placeholder = "supplier";
+    tdSupplier.appendChild(supplierInput);
+
+    var tdCat = document.createElement("td");
+    var sel = document.createElement("select");
+    SUPPLY_CAT_KEYS.forEach(function(k){
+      var c = catByKey(k);
+      var opt = document.createElement("option"); opt.value = k; opt.textContent = c.label;
+      if (k === (data.cat || "pharma")) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    tdCat.appendChild(sel);
+
+    var tdQty = document.createElement("td");
+    var qtyInput = document.createElement("input");
+    qtyInput.type = "number"; qtyInput.min = "0"; qtyInput.step = "any"; qtyInput.value = data.qty !== undefined ? data.qty : 0;
+    tdQty.appendChild(qtyInput);
+
+    var tdFactor = document.createElement("td");
+    var factorInput = document.createElement("input");
+    factorInput.type = "number"; factorInput.min = "0"; factorInput.step = "0.1";
+    factorInput.value = data.factor !== undefined ? data.factor : catByKey(data.cat || "pharma").factor;
+    factorInput.dataset.userEdited = (data.factor !== undefined) ? "1" : "0";
+    tdFactor.appendChild(factorInput);
+
+    var tdLookup = document.createElement("td");
+    var lookupLink = document.createElement("a");
+    lookupLink.href = "https://www.medzerocarbon.com/"; lookupLink.target = "_blank"; lookupLink.rel = "noopener";
+    lookupLink.textContent = "🔎"; lookupLink.title = "Search this item on Lancet MedZero";
+    tdLookup.appendChild(lookupLink);
+
+    var tdSrc = document.createElement("td");
+    var srcTag = document.createElement("span"); srcTag.className = "src-tag";
+    var devBadge = document.createElement("div"); devBadge.className = "dev-badge";
+    tdSrc.appendChild(srcTag); tdSrc.appendChild(devBadge);
+
+    var tdCo2 = document.createElement("td"); tdCo2.className = "col-co2"; tdCo2.textContent = "0";
+
+    var tdRm = document.createElement("td"); tdRm.className = "col-rm";
+    var rmBtn = document.createElement("button"); rmBtn.className = "rm-btn"; rmBtn.type = "button"; rmBtn.textContent = "×";
+    rmBtn.addEventListener("click", function(){ tr.remove(); recalcSupply(); });
+    tdRm.appendChild(rmBtn);
+
+    tr.appendChild(tdItem); tr.appendChild(tdSupplier); tr.appendChild(tdCat); tr.appendChild(tdQty);
+    tr.appendChild(tdFactor); tr.appendChild(tdLookup); tr.appendChild(tdSrc); tr.appendChild(tdCo2); tr.appendChild(tdRm);
+
+    function syncTitle(){ lookupLink.title = itemInput.value.trim() ? ("Search \"" + itemInput.value.trim() + "\" on Lancet MedZero") : "Search this item on Lancet MedZero"; }
+    sel.addEventListener("change", function(){ if (factorInput.dataset.userEdited !== "1"){ factorInput.value = catByKey(sel.value).factor; } recalcSupply(); });
+    factorInput.addEventListener("input", function(){ factorInput.dataset.userEdited = "1"; recalcSupply(); });
+    qtyInput.addEventListener("input", recalcSupply);
+    itemInput.addEventListener("input", function(){ syncTitle(); recalcSupply(); });
+    supplierInput.addEventListener("input", recalcSupply);
+    syncTitle();
+
+    document.getElementById("supply-body").appendChild(tr);
+  }
+
+  function supplyRowData(tr){
+    var item = tr.children[0].querySelector("input").value.trim();
+    var supplier = tr.children[1].querySelector("input").value.trim();
+    var cat = tr.children[2].querySelector("select").value;
+    var qty = parseFloat(tr.children[3].querySelector("input").value) || 0;
+    var factorInput = tr.children[4].querySelector("input");
+    var factor = parseFloat(factorInput.value) || 0;
+    var isPrimary = factorInput.dataset.userEdited === "1";
+    return {item:item, supplier:supplier, cat:cat, qty:qty, factor:factor, isPrimary:isPrimary, co2: qty*factor};
+  }
+
+  function recalcSupply(){
+    var rows = Array.prototype.slice.call(document.querySelectorAll("#supply-body tr"));
+    var total = 0, primaryCount = 0;
+    rows.forEach(function(tr){
+      var d = supplyRowData(tr);
+      tr.querySelector(".col-co2").textContent = d.co2.toLocaleString(undefined,{maximumFractionDigits:1});
+      var tag = tr.querySelector(".src-tag"); var badge = tr.querySelector(".dev-badge");
+      tag.textContent = d.isPrimary ? "Primary" : "Estimated";
+      tag.className = "src-tag" + (d.isPrimary ? " primary" : "");
+      if (!d.isPrimary){ badge.textContent = "—"; badge.className = "dev-badge neutral"; }
+      else {
+        var def = catByKey(d.cat).factor;
+        var diff = def>0 ? ((d.factor-def)/def)*100 : 0;
+        if (Math.abs(diff)<1){ badge.textContent="≈ avg"; badge.className="dev-badge neutral"; }
+        else if (diff<0){ badge.textContent="↓ "+Math.abs(diff).toFixed(0)+"%"; badge.className="dev-badge better"; }
+        else { badge.textContent="↑ "+diff.toFixed(0)+"%"; badge.className="dev-badge worse"; }
+      }
+      total += d.co2;
+      if (d.isPrimary) primaryCount++;
+    });
+    document.getElementById("supply-total").textContent = total.toLocaleString(undefined,{maximumFractionDigits:1});
+    var chip = document.getElementById("supply-status-chip");
+    chip.textContent = rows.length ? "✓ บันทึกแล้ว" : "⏳ รอกรอก";
+    chip.className = "tag-chip " + (rows.length ? "status-done" : "status-pending");
+    saveSupply();
+    renderAll();
+  }
+
+  document.getElementById("supply-add-row").addEventListener("click", function(){ buildSupplyRow({item:"", cat:"pharma", qty:0}); recalcSupply(); });
+
+  // populate affiliation selects
+  document.querySelectorAll("#wd-affil").forEach ? null : null;
+  (function(){
+    var sel = document.getElementById("wd-affil");
+    AFFILIATIONS.forEach(function(a){ var o=document.createElement("option"); o.value=a; o.textContent=a; sel.appendChild(o); });
+  })();
+
+  // default date fields = today
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById("wd-date").value = today;
+  document.getElementById("wm-date").value = today;
+
+  // ---------- tabs ----------
+  document.querySelectorAll(".tabbar").forEach(function(bar){
+    bar.querySelectorAll("button").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        bar.querySelectorAll("button").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        var card = bar.closest(".module-card");
+        card.querySelectorAll(".tabpane").forEach(function(p){ p.classList.remove("active"); });
+        document.getElementById(btn.dataset.tab).classList.add("active");
+      });
+    });
+  });
+
+  // ---------- waste daily ----------
+  function wdTotal(){
+    var sum = 0; document.querySelectorAll(".wd-w").forEach(function(i){ sum += parseFloat(i.value)||0; });
+    return sum;
+  }
+  document.querySelectorAll(".wd-w").forEach(function(i){
+    i.addEventListener("input", function(){ document.getElementById("wd-total").textContent = wdTotal().toLocaleString() + " kg"; });
+  });
+  document.getElementById("wd-save").addEventListener("click", function(){
+    var w = {};
+    document.querySelectorAll(".wd-w").forEach(function(i){ w[i.dataset.k] = parseFloat(i.value)||0; });
+    var total = wdTotal();
+    if (total <= 0){ flashMsg("wd-msg", "กรอกน้ำหนักอย่างน้อย 1 ประเภทก่อนบันทึก", true); return; }
+    var infKg = w.inf;
+    var genKg = w.dry + w.wet + w.haz + w.chem + w.rec;
+    var affil = document.getElementById("wd-affil").value || AFFILIATIONS[0];
+    var round = document.getElementById("wd-round").value;
+    var point = document.getElementById("wd-point").value;
+    var date = document.getElementById("wd-date").value || today;
+    if (genKg > 0){
+      addRecord({module:"waste", affil:affil, date:date,
+        detail:"ขยะรายวัน รอบ"+round+" · จุดพัก"+point, qty:genKg, unit:"kg", cat:"waste_gen",
+        ghgKg: genKg * catByKey("waste_gen").factor, status:"pending", recorder:"—"});
+    }
+    if (infKg > 0){
+      addRecord({module:"waste", affil:affil, date:date,
+        detail:"ขยะติดเชื้อ รายวัน รอบ"+round, qty:infKg, unit:"kg", cat:"waste_inf",
+        ghgKg: infKg * catByKey("waste_inf").factor, status:"pending", recorder:"—"});
+    }
+    flashMsg("wd-msg", "บันทึกแล้ว — รวม " + total.toLocaleString() + " kg");
+    document.querySelectorAll(".wd-w").forEach(function(i){ i.value = 0; });
+    document.getElementById("wd-total").textContent = "0 kg";
+  });
+  document.getElementById("wd-clear").addEventListener("click", function(){
+    document.querySelectorAll(".wd-w").forEach(function(i){ i.value = 0; });
+    document.getElementById("wd-total").textContent = "0 kg";
+  });
+
+  // ---------- waste recycle ----------
+  document.getElementById("wr-save").addEventListener("click", function(){
+    var ids = ["wr-box","wr-pet","wr-plastic","wr-glass","wr-can","wr-other"];
+    var sum = 0; ids.forEach(function(id){ sum += parseFloat(document.getElementById(id).value)||0; });
+    if (sum <= 0){ flashMsg("wr-msg", "กรอกน้ำหนักรีไซเคิลก่อนบันทึก", true); return; }
+    addRecord({module:"waste", affil:AFFILIATIONS[0], date: document.getElementById("wd-date").value || today,
+      detail:"ขยะรีไซเคิล (กระดาษ/PET/พลาสติก/แก้ว/อลูมิเนียม/อื่นๆ)", qty:sum, unit:"kg", cat:"waste_gen",
+      ghgKg: sum * catByKey("waste_gen").factor, status:"pending", recorder:"—"});
+    flashMsg("wr-msg", "บันทึกข้อมูลรีไซเคิลแล้ว — รวม " + sum.toLocaleString() + " kg");
+    ids.forEach(function(id){ document.getElementById(id).value = 0; });
+  });
+  document.getElementById("wr-clear").addEventListener("click", function(){
+    ["wr-box","wr-pet","wr-plastic","wr-glass","wr-can","wr-other"].forEach(function(id){ document.getElementById(id).value = 0; });
+  });
+
+  // ---------- water meter ----------
+  function wmTotal(){
+    var gate5 = parseFloat(document.getElementById("wm-gate5").value)||0;
+    var siam = parseFloat(document.getElementById("wm-siam").value)||0;
+    var siph = parseFloat(document.getElementById("wm-siph").value)||0;
+    var tech = parseFloat(document.getElementById("wm-tech").value)||0;
+    var net = Math.max(gate5 - siph - tech, 0) + siam;
+    return net;
+  }
+  ["wm-gate5","wm-siam","wm-siph","wm-tech"].forEach(function(id){
+    document.getElementById(id).addEventListener("input", function(){
+      document.getElementById("wm-total").textContent = wmTotal().toLocaleString() + " ลบ.ม.";
+    });
+  });
+  document.getElementById("wm-save").addEventListener("click", function(){
+    var total = wmTotal();
+    var cost = parseFloat(document.getElementById("wm-cost").value)||0;
+    if (total <= 0 || !cost){ flashMsg("wm-msg", "กรอกเลขมาตรและค่าน้ำก่อนบันทึก", true); return; }
+    addRecord({module:"water", affil:AFFILIATIONS[0], date: document.getElementById("wm-date").value || today,
+      detail:"มาตรวัดน้ำ ประตู 5 + สยามินทร์ (" + (document.getElementById("wm-invno").value || "ไม่มีเลขที่ใบแจ้งหนี้") + ")",
+      qty:total, unit:"ลบ.ม.", cat:"water", ghgKg: total * catByKey("water").factor, status:"pending", recorder:"—"});
+    flashMsg("wm-msg", "บันทึกข้อมูลน้ำแล้ว — รวม " + total.toLocaleString() + " ลบ.ม.");
+    ["wm-gate5","wm-siam","wm-siph","wm-tech","wm-cost","wm-invno"].forEach(function(id){ document.getElementById(id).value = ""; });
+    document.getElementById("wm-total").textContent = "0 ลบ.ม.";
+  });
+  document.getElementById("wm-clear").addEventListener("click", function(){
+    ["wm-gate5","wm-siam","wm-siph","wm-tech","wm-cost","wm-invno"].forEach(function(id){ document.getElementById(id).value = ""; });
+    document.getElementById("wm-total").textContent = "0 ลบ.ม.";
+  });
+
+  // ---------- water treatment ----------
+  function updateRecovery(){
+    var vin = parseFloat(document.getElementById("wt-in").value)||0;
+    var rec = parseFloat(document.getElementById("wt-recycle").value)||0;
+    document.getElementById("wt-recovery").value = vin > 0 ? ((rec/vin)*100).toFixed(1) + "%" : "";
+  }
+  document.getElementById("wt-in").addEventListener("input", updateRecovery);
+  document.getElementById("wt-recycle").addEventListener("input", updateRecovery);
+  document.getElementById("wt-save").addEventListener("click", function(){
+    var vin = parseFloat(document.getElementById("wt-in").value)||0;
+    var vout = parseFloat(document.getElementById("wt-out").value)||0;
+    if (!vin || !vout){ flashMsg("wt-msg", "กรอกน้ำเข้า/ออกก่อนบันทึก", true); return; }
+    addRecord({module:"water", affil:AFFILIATIONS[0], date: document.getElementById("wm-date").value || today,
+      detail:"บำบัดน้ำเสีย — เข้า " + vin.toLocaleString() + " ออก " + vout.toLocaleString() + " ลบ.ม.",
+      qty:0, unit:"ลบ.ม.", cat:null, ghgKg:0, status:"pending", recorder:"—", info:true});
+    flashMsg("wt-msg", "บันทึกข้อมูลบำบัดน้ำเสียแล้ว (ไม่นับ GHG เพิ่ม — เป็นข้อมูลกำกับ)");
+  });
+  document.getElementById("wt-clear").addEventListener("click", function(){
+    ["wt-in","wt-out","wt-recycle","wt-ph","wt-bod","wt-notes"].forEach(function(id){ document.getElementById(id).value = ""; });
+    document.getElementById("wt-recovery").value = "";
+  });
+
+  function flashMsg(id, text, isErr){
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.style.color = isErr ? "var(--bad)" : "var(--good)";
+    setTimeout(function(){ if (el.textContent === text) el.textContent = ""; }, 4000);
+  }
+
+  // ---------- render: KPIs, GHG summary, history, status chips ----------
+  function periodRecords(){
+    return records; // single-period demo dataset; filter hook lives in renderHistory()
+  }
+
+  function renderAll(){
+    var wasteKg = 0, waterM3 = 0;
+    var byCat = {}; var qtyByCat = {};
+    CATS.forEach(function(c){ byCat[c.key]=0; qtyByCat[c.key]=0; });
+
+    records.forEach(function(r){
+      if (r.cat && byCat.hasOwnProperty(r.cat)){ byCat[r.cat]+=r.ghgKg; qtyByCat[r.cat]+=r.qty; }
+      if (r.module === "waste" && r.cat) wasteKg += r.qty;
+      if (r.module === "water" && r.cat === "water") waterM3 += r.qty;
+    });
+
+    var supplyRows = Array.prototype.slice.call(document.querySelectorAll("#supply-body tr")).map(supplyRowData);
+    var supplyTotal = 0, supplyPrimary = 0;
+    var contribItems = []; // unified list for "highest contributors"
+    supplyRows.forEach(function(d){
+      byCat[d.cat] = (byCat[d.cat]||0) + d.co2;
+      qtyByCat[d.cat] = (qtyByCat[d.cat]||0) + d.qty;
+      supplyTotal += d.co2;
+      if (d.isPrimary) supplyPrimary++;
+      if (d.co2 > 0) contribItems.push({name:d.item||"(untitled)", co2:d.co2, color: catByKey(d.cat).color});
+    });
+    records.forEach(function(r){
+      if (r.cat && r.ghgKg > 0) contribItems.push({name:r.detail||r.module, co2:r.ghgKg, color: catByKey(r.cat).color});
+    });
+
+    var totalKg = 0; CATS.forEach(function(c){ totalKg += byCat[c.key]||0; });
+    var totalT = totalKg / 1000;
+
+    document.getElementById("kpi-waste-total").textContent = wasteKg.toLocaleString(undefined,{maximumFractionDigits:0});
+    document.getElementById("kpi-water-total").textContent = waterM3.toLocaleString(undefined,{maximumFractionDigits:0});
+    document.getElementById("kpi-supply-total").textContent = supplyTotal.toLocaleString(undefined,{maximumFractionDigits:0});
+    document.getElementById("kpi-supply-lines").textContent = supplyRows.length + " รายการ";
+    document.getElementById("kpi-total").textContent = totalT.toLocaleString(undefined,{maximumFractionDigits:1});
+    var scope3El = document.getElementById("scope3-total");
+    if (scope3El) scope3El.textContent = totalT > 0 ? totalT.toLocaleString(undefined,{maximumFractionDigits:1}) + " t" : "—";
+    document.getElementById("kpi-primary-pct").textContent = supplyRows.length ? Math.round((supplyPrimary/supplyRows.length)*100) : 0;
+    document.getElementById("kpi-primary-sub").textContent = supplyPrimary + " of " + supplyRows.length + " supply-chain lines verified";
+
+    var target = parseFloat(document.getElementById("target-input").value) || 0;
+    var targetEl = document.getElementById("kpi-target-delta");
+    if (target > 0 && totalT > 0){
+      var pct = ((totalT - target) / target) * 100;
+      targetEl.textContent = (pct<=0?"↓ ":"↑ ") + Math.abs(pct).toFixed(1) + "% vs เป้า";
+      targetEl.className = "kpi-delta " + (pct<=0?"good":"bad");
+    } else { targetEl.textContent = "—"; targetEl.className = "kpi-delta"; }
+
+    var baseline = parseFloat(document.getElementById("baseline-input").value) || 0;
+    ["kpi-waste-delta","kpi-water-delta"].forEach(function(id){
+      var el = document.getElementById(id); el.textContent = baseline ? "—" : "ยังไม่มี baseline"; el.className="kpi-delta";
+    });
+
+    var wasteDone = wasteKg > 0, waterDone = waterM3 > 0, supplyDone = supplyRows.length > 0;
+    var wChip = document.getElementById("chk-waste"); wChip.textContent = (wasteDone?"✓ ":"⏳ ") + "ขยะ"; wChip.className = "chk " + (wasteDone?"done":"pending");
+    var wtChip = document.getElementById("chk-water"); wtChip.textContent = (waterDone?"✓ ":"⏳ ") + "น้ำ"; wtChip.className = "chk " + (waterDone?"done":"pending");
+    var spChip = document.getElementById("chk-supply"); spChip.textContent = (supplyDone?"✓ ":"⏳ ") + "จัดซื้อ"; spChip.className = "chk " + (supplyDone?"done":"pending");
+    document.getElementById("kpi-module-count").textContent = "ครบ " + ((wasteDone?1:0)+(waterDone?1:0)+(supplyDone?1:0)) + "/3 โมดูล";
+    document.getElementById("waste-status-chip").textContent = wasteDone ? "✓ บันทึกแล้ว" : "⏳ รอกรอก";
+    document.getElementById("waste-status-chip").className = "tag-chip " + (wasteDone?"status-done":"status-pending");
+    document.getElementById("water-status-chip").textContent = waterDone ? "✓ บันทึกแล้ว" : "⏳ รอกรอก";
+    document.getElementById("water-status-chip").className = "tag-chip " + (waterDone?"status-done":"status-pending");
+
+    renderGHG(byCat, qtyByCat, totalKg, totalT, target);
+    renderDonut(byCat, totalKg);
+    renderContributors(contribItems);
+    renderHistory();
+  }
+
+  function renderGHG(byCat, qtyByCat, totalKg, totalT, target){
+    var box = document.getElementById("ghg-formula-box");
+    if (totalKg <= 0){ box.innerHTML = '<div class="hist-empty">ยังไม่มีข้อมูล — บันทึกในโมดูลด้านล่างเพื่อดูสรุป</div>'; return; }
+    var grid = document.createElement("div"); grid.className = "ghg-grid";
+    CATS.forEach(function(c){
+      var kg = byCat[c.key]||0; if (kg<=0) return;
+      var item = document.createElement("div"); item.className = "ghg-item";
+      item.innerHTML = '<div class="gk">'+c.label+'</div><div class="gv">'+(kg/1000).toLocaleString(undefined,{maximumFractionDigits:1})+' tCO₂eq</div>' +
+        '<div class="gf">'+(qtyByCat[c.key]||0).toLocaleString(undefined,{maximumFractionDigits:0})+' '+c.unit+' × '+c.factor+'</div>';
+      grid.appendChild(item);
+    });
+    box.innerHTML = ""; box.appendChild(grid);
+
+    var stack = document.createElement("div"); stack.className = "ghg-stack";
+    CATS.forEach(function(c){
+      var kg = byCat[c.key]||0; if (kg<=0) return;
+      var pct = (kg/totalKg)*100;
+      var seg = document.createElement("div"); seg.className="seg";
+      seg.style.width = pct.toFixed(1)+"%"; seg.style.background = resolveColor(c.color);
+      seg.textContent = pct >= 10 ? pct.toFixed(0)+"%" : "";
+      seg.title = c.label + " " + pct.toFixed(1) + "%";
+      stack.appendChild(seg);
+    });
+    box.appendChild(stack);
+
+    var totalBox = document.createElement("div"); totalBox.className = "ghg-total";
+    var vsTxt = "";
+    if (target > 0){
+      var pct2 = ((totalT-target)/target)*100;
+      vsTxt = " — " + (pct2<=0?"ต่ำกว่าเป้าหมาย ":"สูงกว่าเป้าหมาย ") + Math.abs(pct2).toFixed(1) + "%";
+    }
+    totalBox.innerHTML = "🎯 รวม <b>" + totalT.toLocaleString(undefined,{maximumFractionDigits:1}) + " tCO₂eq</b>" + vsTxt;
+    box.appendChild(totalBox);
+  }
+
+  function renderDonut(byCat, totalKg){
+    var wrap = document.getElementById("donut-wrap");
+    wrap.innerHTML = "";
+    if (totalKg <= 0){ wrap.innerHTML = '<div class="hist-empty">ยังไม่มีข้อมูล</div>'; return; }
+    var donut = document.createElement("div"); donut.className = "donut";
+    var legend = document.createElement("div"); legend.className = "legend";
+    var gradParts = []; var acc = 0;
+    CATS.forEach(function(c){
+      var kg = byCat[c.key]||0; if (kg<=0) return;
+      var pct = (kg/totalKg)*100; var start=acc, end=acc+pct; var col = resolveColor(c.color);
+      gradParts.push(col+" "+start.toFixed(2)+"% "+end.toFixed(2)+"%"); acc = end;
+      var row = document.createElement("div"); row.className="legend-row";
+      row.innerHTML = '<span class="legend-dot" style="background:'+col+';"></span><span class="legend-name">'+c.label+'</span>' +
+        '<span class="legend-val">'+(kg/1000).toLocaleString(undefined,{maximumFractionDigits:1})+' t ('+pct.toFixed(0)+'%)</span>';
+      legend.appendChild(row);
+    });
+    donut.style.background = "conic-gradient(" + gradParts.join(",") + ")";
+    var center = document.createElement("div"); center.className="donut-center";
+    center.innerHTML = '<div class="n">'+(totalKg/1000).toLocaleString(undefined,{maximumFractionDigits:1})+'</div><div class="u">tCO₂eq</div>';
+    donut.appendChild(center);
+    wrap.appendChild(donut); wrap.appendChild(legend);
+  }
+
+  function renderContributors(items){
+    var box = document.getElementById("contrib-box");
+    box.innerHTML = "";
+    var sorted = items.sort(function(a,b){ return b.co2-a.co2; }).slice(0,6);
+    if (!sorted.length){ box.innerHTML = '<div class="hist-empty">ยังไม่มีข้อมูล</div>'; return; }
+    var max = sorted[0].co2;
+    sorted.forEach(function(d,i){
+      var row = document.createElement("div"); row.className="contrib-row";
+      row.innerHTML = '<div class="contrib-rank">'+(i+1)+'.</div><div class="contrib-name" title="'+d.name+'">'+d.name+'</div>' +
+        '<div class="contrib-track"><div class="contrib-fill" style="width:'+((d.co2/max)*100).toFixed(1)+'%; background:'+resolveColor(d.color)+';"></div></div>' +
+        '<div class="contrib-val">'+d.co2.toLocaleString(undefined,{maximumFractionDigits:1})+' kg</div>';
+      box.appendChild(row);
+    });
+  }
+
+  function statusBadge(status){
+    if (status === "verified") return '<span class="status-badge verified">✓ Verified</span>';
+    if (status === "manager") return '<span class="status-badge manager">⏳ รอ Manager</span>';
+    return '<span class="status-badge pending">⏳ รอกรอก</span>';
+  }
+  function modBadge(m){
+    var map = {waste:"🗑️ ขยะ", water:"💧 น้ำ"};
+    return '<span class="mod-badge">' + (map[m]||m) + '</span>';
+  }
+
+  function renderHistory(){
+    var body = document.getElementById("hist-body");
+    body.innerHTML = "";
+    var list = records.slice();
+    var filter = document.getElementById("hist-filter").value;
+    if (filter) list = list.filter(function(r){ return r.date && r.date.slice(0,7) === filter; });
+    document.getElementById("hist-count").textContent = "แสดง " + Math.min(list.length, showAllHistory?list.length:4) + " จาก " + list.length + " รายการ";
+    document.getElementById("hist-toggle").textContent = showAllHistory ? "แสดงน้อยลง ←" : "ดูทั้งหมด →";
+    if (!list.length){ body.innerHTML = '<tr><td colspan="8" class="hist-empty">ยังไม่มีรายการที่บันทึก</td></tr>'; return; }
+    var shown = showAllHistory ? list : list.slice(0,4);
+    shown.forEach(function(r){
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>"+(r.date||"—")+"</td><td>"+modBadge(r.module)+"</td><td>"+(r.affil||"—")+"</td><td>"+(r.detail||"")+
+        "</td><td><b>"+(r.qty?r.qty.toLocaleString(undefined,{maximumFractionDigits:1}):"—")+"</b> "+(r.unit||"")+
+        "</td><td>"+(r.ghgKg?(r.ghgKg/1000).toFixed(2):"—")+"</td><td>"+statusBadge(r.status)+"</td><td>"+(r.recorder||"—")+"</td>";
+      body.appendChild(tr);
+    });
+  }
+
+  document.getElementById("hist-toggle").addEventListener("click", function(e){ e.preventDefault(); showAllHistory = !showAllHistory; renderHistory(); });
+  document.getElementById("hist-filter").addEventListener("change", renderHistory);
+  document.getElementById("target-input").addEventListener("input", renderAll);
+  document.getElementById("baseline-input").addEventListener("input", renderAll);
+
+  function toCSV(){
+    var lines = ["Date,Module,Affiliation/Supplier,Detail,Quantity,Unit,GHG (tCO2eq),Status"];
+    records.forEach(function(r){
+      lines.push([r.date, r.module, r.affil, (r.detail||"").replace(/,/g,";"), r.qty, r.unit, r.ghgKg?(r.ghgKg/1000).toFixed(3):"", r.status].join(","));
+    });
+    Array.prototype.slice.call(document.querySelectorAll("#supply-body tr")).forEach(function(tr){
+      var d = supplyRowData(tr);
+      lines.push([document.getElementById("f-period").value, "supply", (d.supplier||"").replace(/,/g,";"),
+        (d.item||"").replace(/,/g,";") + " (" + catByKey(d.cat).label.replace(/,/g,";") + ")",
+        d.qty, "kg", (d.co2/1000).toFixed(3), d.isPrimary?"primary":"estimated"].join(","));
+    });
+    return lines.join("\n");
+  }
+  function flashExport(id, text){ var el=document.getElementById(id); el.textContent=text; setTimeout(function(){ if(el.textContent===text) el.textContent=""; },3500); }
+  document.getElementById("hist-export").addEventListener("click", function(){
+    claude.use("downloads").then(function(d){
+      if (!d){ flashExport("hist-msg","ดาวน์โหลดไม่พร้อมใช้งานในหน้านี้"); return; }
+      d.save({filename:"heall-scope3-history.csv", data:toCSV()}).then(function(){ flashExport("hist-msg","บันทึกแล้ว"); });
+    }).catch(function(){ flashExport("hist-msg","ดาวน์โหลดไม่พร้อมใช้งานในหน้านี้"); });
+  });
+  document.getElementById("export-csv").addEventListener("click", function(){
+    claude.use("downloads").then(function(d){
+      if (!d){ flashExport("export-msg","Download isn't available in this view — try Copy instead."); return; }
+      d.save({filename:"heall-scope3-history.csv", data:toCSV()}).then(function(){ flashExport("export-msg","Saved."); });
+    }).catch(function(){ flashExport("export-msg","Download isn't available in this view — try Copy instead."); });
+  });
+  document.getElementById("copy-csv").addEventListener("click", function(){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(toCSV()).then(function(){ flashExport("export-msg","Copied to clipboard."); });
+    } else { flashExport("export-msg","Clipboard not available."); }
+  });
+
+  // ---------- ERP mock cards ----------
+  var ERP_KEY = "heall_erp_connections_v1";
+  var ERP_SYSTEMS = [
+    {key:"his", name:"Hospital Information System", tag:"HIS · Pharmacy & Lab stock", desc:"ข้อมูลสต๊อกยา/lab จากระบบเช่น MediCORE"},
+    {key:"erp", name:"Inventory / ERP system", tag:"ERP · Procurement & warehouse", desc:"ข้อมูลจัดซื้อ/คลังจาก ERP เช่น Roots (Odoo-based)"},
+    {key:"manual", name:"Direct entry", tag:"Manual", desc:"กรอกข้อมูลเองผ่านโมดูลด้านบน — ใช้งานได้จริงตอนนี้", always:true}
+  ];
+  function loadErp(){ try{ var raw=localStorage.getItem(ERP_KEY); return raw?JSON.parse(raw):{}; } catch(e){ return {}; } }
+  function saveErp(s){ try{ localStorage.setItem(ERP_KEY, JSON.stringify(s)); } catch(e){} }
+  (function(){
+    var grid = document.getElementById("erp-grid");
+    var state = loadErp();
+    ERP_SYSTEMS.forEach(function(sys){
+      var connected = sys.always || !!state[sys.key];
+      var card = document.createElement("div"); card.className = "card erp-card";
+      card.innerHTML = '<div class="erp-head"><div><div class="k">'+sys.tag+'</div><h3>'+sys.name+'</h3></div><div class="erp-dot '+(connected?"on":"off")+'"></div></div>' +
+        '<p>'+sys.desc+'</p>' +
+        (sys.always ? '<button class="erp-connect connected" disabled>● ใช้งานอยู่</button>'
+          : '<button class="erp-connect'+(connected?" connected":"")+'" data-key="'+sys.key+'">'+(connected?"● เชื่อมต่อแล้ว (mock)":"เชื่อมต่อ (mock)")+'</button>');
+      grid.appendChild(card);
+    });
+    grid.querySelectorAll(".erp-connect[data-key]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var s = loadErp(); var k = btn.dataset.key; s[k] = !s[k]; saveErp(s);
+        btn.classList.toggle("connected", s[k]);
+        btn.textContent = s[k] ? "● เชื่อมต่อแล้ว (mock)" : "เชื่อมต่อ (mock)";
+        btn.closest(".erp-card").querySelector(".erp-dot").className = "erp-dot " + (s[k]?"on":"off");
+      });
+    });
+  })();
+
+  // ---------- Emission Factors table ----------
+  (function(){
+    var tbody = document.getElementById("factors-body");
+    CATS.forEach(function(c){
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>"+c.label+"</td><td>"+c.factor+"</td><td>"+c.unit+"</td><td style='color:var(--ink-soft); font-size:12.5px;'>"+c.source+"</td>";
+      tbody.appendChild(tr);
+    });
+  })();
+
+  // ---------- shared OCR factory ----------
+  function setupOCR(containerId, onParsed){
+    var box = document.getElementById(containerId);
+    box.innerHTML =
+      '<div class="ocr-drop"><div class="oi">📸</div><div class="ot"><b>คลิกเพื่อเลือกรูป</b> หรือวางไฟล์ตรงนี้</div>' +
+      '<input type="file" accept="image/*" style="display:none;"></div>' +
+      '<div class="ocr-status" style="display:none;"></div>' +
+      '<div style="display:none;" class="ocr-result-inner">' +
+      '<div class="ocr-conf"></div>' +
+      '<details class="ocr-raw-toggle"><summary>ดูข้อความดิบจาก OCR</summary><div class="ocr-raw"></div></details>' +
+      '</div>';
+    var drop = box.querySelector(".ocr-drop");
+    var fileInput = box.querySelector('input[type="file"]');
+    var statusEl = box.querySelector(".ocr-status");
+    var resultInner = box.querySelector(".ocr-result-inner");
+    var rawEl = box.querySelector(".ocr-raw");
+    var confEl = box.querySelector(".ocr-conf");
+
+    function setStatus(html, spin){ statusEl.style.display="flex"; statusEl.innerHTML=(spin?'<span class="ocr-spinner"></span>':"")+"<span>"+html+"</span>"; }
+    function clearStatus(){ statusEl.style.display="none"; statusEl.innerHTML=""; }
+
+    function parseNumbers(text){
+      var kgMatch = text.match(/([\d,]+(?:\.\d+)?)\s*(?:kg|กก|กิโล)/i);
+      if (kgMatch) return parseFloat(kgMatch[1].replace(/,/g,""));
+      var nums = (text.match(/[\d,]+(?:\.\d+)?/g)||[]).map(function(n){return parseFloat(n.replace(/,/g,""));}).filter(function(n){return !isNaN(n)&&n>0;});
+      return nums.length ? Math.max.apply(null, nums) : null;
+    }
+
+    function runOCR(file){
+      if (typeof Tesseract === "undefined"){
+        setStatus("โหลด OCR engine ไม่สำเร็จ — กรอกข้อมูลด้วยมือในฟอร์มด้านบนแทนได้เลย", false);
+        return;
+      }
+      setStatus("กำลังอ่านภาพด้วย OCR... (ครั้งแรกอาจใช้เวลาสักครู่)", true);
+      resultInner.style.display = "none";
+      Tesseract.recognize(file, "eng+tha", {
+        workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",
+        corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd.wasm.js"
+      }).then(function(result){
+        var text = (result && result.data && result.data.text) || "";
+        var conf = (result && result.data && result.data.confidence) || 0;
+        rawEl.textContent = text.trim() || "(ไม่พบข้อความในภาพ)";
+        confEl.textContent = "ความมั่นใจของ OCR: " + conf.toFixed(0) + "% (ค่าจริงจาก Tesseract) — ตรวจทานก่อนบันทึกเสมอ";
+        clearStatus();
+        resultInner.style.display = "block";
+        onParsed(parseNumbers(text), text);
+      }).catch(function(err){
+        setStatus("OCR อ่านไม่สำเร็จ — กรอกด้วยมือในฟอร์มด้านบนแทนได้เลย", false);
+      });
+    }
+
+    drop.addEventListener("click", function(){ fileInput.click(); });
+    drop.addEventListener("dragover", function(e){ e.preventDefault(); drop.classList.add("drag"); });
+    drop.addEventListener("dragleave", function(){ drop.classList.remove("drag"); });
+    drop.addEventListener("drop", function(e){ e.preventDefault(); drop.classList.remove("drag"); if (e.dataTransfer.files[0]) runOCR(e.dataTransfer.files[0]); });
+    fileInput.addEventListener("change", function(){ if (fileInput.files[0]) runOCR(fileInput.files[0]); });
+  }
+
+  setupOCR("ocr-waste", function(qty){
+    if (qty !== null){
+      document.getElementById("waste-tabbar").querySelector('[data-tab="waste-daily"]').click();
+      document.querySelector('.wd-w[data-k="inf"]').value = qty;
+      document.getElementById("wd-total").textContent = wdTotal().toLocaleString() + " kg";
+    }
+  });
+  setupOCR("ocr-water", function(qty){
+    if (qty !== null){ document.getElementById("wm-cost").value = qty; }
+  });
+
+  // ---------- page switching (Dashboard <-> Data Entry) ----------
+  function showPage(name){
+    document.getElementById("page-dashboard").style.display = name === "dashboard" ? "" : "none";
+    document.getElementById("page-entry").style.display = name === "entry" ? "" : "none";
+    document.querySelectorAll(".rail nav a[data-page]").forEach(function(a){
+      a.classList.toggle("active", a.dataset.page === name);
+    });
+  }
+  document.querySelectorAll(".rail nav a[data-page]").forEach(function(a){
+    a.addEventListener("click", function(e){
+      e.preventDefault();
+      showPage(a.dataset.page);
+      var target = document.querySelector(a.getAttribute("href"));
+      if (target && target.scrollIntoView) target.scrollIntoView({behavior:"smooth", block:"start"});
+    });
+  });
+  document.getElementById("cta-add-data").addEventListener("click", function(){
+    showPage("entry");
+    var e1 = document.getElementById("entry");
+    if (e1 && e1.scrollIntoView) e1.scrollIntoView({behavior:"smooth", block:"start"});
+  });
+  document.getElementById("back-to-dashboard").addEventListener("click", function(e){
+    e.preventDefault();
+    showPage("dashboard");
+    var d1 = document.getElementById("dashboard");
+    if (d1 && d1.scrollIntoView) d1.scrollIntoView({behavior:"smooth", block:"start"});
+  });
+
+  // ---------- load supply-chain rows (saved, or starter demo data) ----------
+  var savedSupply = loadSupply();
+  (savedSupply && savedSupply.length ? savedSupply : SUPPLY_STARTER).forEach(buildSupplyRow);
+  recalcSupply();
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
